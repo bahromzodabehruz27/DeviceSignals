@@ -1,8 +1,6 @@
 package tj.behruz.devicesignals.sdk.internal.modules
 
 import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.os.Build
 import tj.behruz.devicesignals.sdk.Module
 import tj.behruz.devicesignals.sdk.internal.CollectContext
 import tj.behruz.devicesignals.sdk.internal.ModuleResult

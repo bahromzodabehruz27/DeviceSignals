@@ -2,7 +2,7 @@
 
 Android SDK for collecting device fingerprints, integrity signals, and fraud detection data.
 
-**Maven coordinates:** `tj.behruz.devicesignals:device-signals-sdk:0.1.0`
+**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.1.0`
 
 **Min SDK:** 24 (Android 7.0)
 
