@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "DeviceSignals"
 include(":app")
+include(":sdk")
  
