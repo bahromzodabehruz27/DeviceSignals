@@ -375,28 +375,70 @@ The effective modules for any `collect()` call is the intersection of `config.en
 
 ## JSON Output Format
 
-`CollectResult.toJson()` produces a structured JSON payload:
+`CollectResult.toJson()` produces a flat JSON payload matching the backend field contract. Raw per-module data (documented below) is still available via `CollectResult.moduleData`.
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "id": "random-uuid",
   "session_id": "your-session-id",
   "visitor_id": "your-visitor-id",
-  "collected_at": "2024-03-22T14:20:00.123Z",
-  "platform": "android",
-  "collection": {
-    "status": "SUCCESS",
-    "duration_ms": 245,
-    "modules_collected": ["app", "hardware", "screen", "integrity", ...],
-    "missing_fields": []
-  },
-  "app": { ... },
-  "hardware": { ... },
-  "screen": { ... },
-  "integrity": { ... }
+  "collected_at": "2026-10-09T04:56:58.152Z",
+  "collection_duration_ms": 89,
+  "platform": "Android",
+  "device_id": "sha256-of-widevine-drm-id",
+  "android_id": "24b31bc1f7f1ee73",
+  "app_guid": "afa0857f-...",
+  "app_version": "6.6.1",
+  "sdk_version": "0.1.1",
+  "android_version": "16",
+  "build_model": "SM-S938B",
+  "build_manufacturer": "samsung",
+  "is_emulator": false,
+  "is_rooted": false,
+  "system_integrity": "TRUSTED",
+  "bootloader_state": "LOCKED",
+  "play_integrity": { "token": "..." },
+  "developer_options_enabled": true,
+  "usb_debugging_enabled": true,
+  "is_debugger_attached": false,
+  "is_app_cloned": false,
+  "is_keyguard_secure": true,
+  "is_debug_build": false,
+  "is_runtime_tampering_detected": false,
+  "is_remote_control_detected": false,
+  "is_screen_capture_detected": false,
+  "is_overlay_detected": false,
+  "is_call_active": false,
+  "call_detected_last_3_minutes": false,
+  "is_microphone_active": false,
+  "vpn_enabled": false,
+  "proxy_enabled": false,
+  "location_simulated": false,
+  "device_ip": null,
+  "network_type": "WIFI",
+  "timezone": "Asia/Tashkent",
+  "region_country": "UZ",
+  "total_storage": 234073620480,
+  "physical_memory": 11653091328,
+  "sim_count": 2,
+  "esim_count": 1,
+  "battery_charging": true,
+  "power_source": "USB",
+  "usb_connected": true,
+  "system_uptime": 468115,
+  "last_boot_time": 1791053702,
+  "collection_status": "SUCCESS",
+  "missing_fields": []
 }
 ```
+
+Notes:
+- `play_integrity` is present only when `playIntegrityCloudProjectNumber` is configured. The backend decodes the token into `play_integrity.app_integrity`, `device_integrity` and `app_access_risk.*`.
+- `device_ip` is always `null`; the backend fills it from the request IP.
+- `total_storage` / `physical_memory` are bytes; `system_uptime` is seconds; `last_boot_time` is a Unix timestamp in seconds.
+- `system_integrity` is `COMPROMISED` if root, emulator, runtime tampering or an unlocked bootloader is detected; `TRUSTED` if all are confirmed clean and the bootloader is locked; otherwise `UNKNOWN`.
+- `missing_fields` lists every SDK-owned field that is `null`; any entry makes `collection_status` `PARTIAL`.
 
 ---
 

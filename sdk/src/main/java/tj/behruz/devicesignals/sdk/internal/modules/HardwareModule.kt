@@ -49,6 +49,8 @@ internal class HardwareModule : SignalModule {
             "soc_model" to socModel,
             "total_ram_mb" to (memInfo.totalMem / (1024 * 1024)),
             "total_storage_mb" to totalStorageMb,
+            "total_storage_bytes" to stat.totalBytes,
+            "total_ram_bytes" to memInfo.totalMem,
             "cpu_cores" to Runtime.getRuntime().availableProcessors(),
             "cpu_architecture" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"),
             "is_emulator" to (emulatorSignals.count { it } >= 2),

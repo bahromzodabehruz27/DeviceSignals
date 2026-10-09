@@ -8,6 +8,7 @@ enum class Module(val jsonKey: String, val isStatic: Boolean) {
     PLAY_INTEGRITY("play_integrity", false),
     DEBUG("debug", false),
     THREATS("threats", false),
+    BEHAVIOR("behavior", false),
     TELEPHONY("telephony", false),
     NETWORK("network", false),
     LOCATION("location", false),

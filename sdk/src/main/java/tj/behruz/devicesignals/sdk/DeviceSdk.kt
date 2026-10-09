@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import tj.behruz.devicesignals.sdk.internal.CallTracker
 import tj.behruz.devicesignals.sdk.internal.DeviceSessionBuilder
 import tj.behruz.devicesignals.sdk.internal.IdentityStore
 import tj.behruz.devicesignals.sdk.internal.ModuleOrchestrator
@@ -17,6 +18,7 @@ import tj.behruz.devicesignals.sdk.internal.CollectContext
 import tj.behruz.devicesignals.sdk.internal.SignalModule
 import tj.behruz.devicesignals.sdk.internal.cache.ModuleCache
 import tj.behruz.devicesignals.sdk.internal.modules.AppModule
+import tj.behruz.devicesignals.sdk.internal.modules.BehaviorModule
 import tj.behruz.devicesignals.sdk.internal.modules.DebugModule
 import tj.behruz.devicesignals.sdk.internal.modules.HardwareModule
 import tj.behruz.devicesignals.sdk.internal.modules.IntegrityModule
@@ -51,6 +53,7 @@ object DeviceSdk {
         this.config = config
         this.identityStore = IdentityStore(appContext)
         ModuleCache.reset()
+        CallTracker.start(appContext)
 
         val modules = mutableListOf(
             AppModule(),
@@ -59,6 +62,7 @@ object DeviceSdk {
             IntegrityModule(),
             DebugModule(),
             ThreatsModule(),
+            BehaviorModule(),
             TelephonyModule(),
             NetworkModule(),
             LocationModule(),

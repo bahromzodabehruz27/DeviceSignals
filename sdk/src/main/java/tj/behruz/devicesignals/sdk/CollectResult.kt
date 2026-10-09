@@ -16,6 +16,5 @@ data class CollectResult(
         status = status,
         durationMs = durationMs,
         moduleData = moduleData,
-        missingFields = missingFields,
     )
 }

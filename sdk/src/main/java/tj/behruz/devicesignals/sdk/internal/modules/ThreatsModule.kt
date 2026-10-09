@@ -4,13 +4,18 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.display.DisplayManager
 import android.os.Build
+import android.view.Display
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import tj.behruz.devicesignals.sdk.Module
 import tj.behruz.devicesignals.sdk.internal.CollectContext
 import tj.behruz.devicesignals.sdk.internal.ModuleResult
 import tj.behruz.devicesignals.sdk.internal.SignalModule
 import tj.behruz.devicesignals.sdk.internal.SignatureStore
+import java.util.concurrent.Executor
+import java.util.function.Consumer
 
 internal class ThreatsModule : SignalModule {
     override val module = Module.THREATS
@@ -32,20 +37,15 @@ internal class ThreatsModule : SignalModule {
         // Overlay detection - requires Activity
         val activity: Activity? = context.activityRef?.get()
         val isOverlayDetected: Boolean?
-        val isScreenBeingCaptured: Boolean?
 
         if (activity != null) {
             isOverlayDetected = detectOverlay(activity)
-            // Screen capture detection requires callback registration (API 34+),
-            // which cannot be done at collection time — report as unavailable
-            isScreenBeingCaptured = null
-            missingFields.add("is_screen_being_captured")
         } else {
             isOverlayDetected = null
-            isScreenBeingCaptured = null
             missingFields.add("is_overlay_detected")
-            missingFields.add("is_screen_being_captured")
         }
+
+        val isScreenBeingCaptured = isAppBeingRecorded(activity) || hasMirroringDisplay(appContext)
 
         // Accessibility services
         val am = appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
@@ -69,6 +69,28 @@ internal class ThreatsModule : SignalModule {
             "is_remote_control_detected" to isRemoteControlDetected,
         )
         return ModuleResult(data = data, missingFields = missingFields)
+    }
+
+    /** API 35+: asks the system whether this app's windows are visible to a screen recorder. */
+    private fun isAppBeingRecorded(activity: Activity?): Boolean {
+        if (activity == null || Build.VERSION.SDK_INT < 35) return false
+        return try {
+            val wm = activity.windowManager
+            val callback = Consumer<Int> { }
+            val state = wm.addScreenRecordingCallback(Executor { it.run() }, callback)
+            wm.removeScreenRecordingCallback(callback)
+            state == WindowManager.SCREEN_RECORDING_STATE_VISIBLE
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Casting / mirroring shows up as an extra non-private display. */
+    private fun hasMirroringDisplay(context: Context): Boolean = try {
+        val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        dm.displays.any { it.displayId != Display.DEFAULT_DISPLAY && (it.flags and Display.FLAG_PRIVATE) == 0 }
+    } catch (_: Exception) {
+        false
     }
 
     private fun detectOverlay(activity: Activity): Boolean {

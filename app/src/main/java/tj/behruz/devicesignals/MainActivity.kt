@@ -2,6 +2,7 @@ package tj.behruz.devicesignals
 
 import android.Manifest
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -173,6 +174,7 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
                         try {
                             val result = DeviceSdk.collect(sessionId, visitorId, selected)
                             collectResult = result
+                            Log.i("DeviceSignalsDemo", result.toJson())
                             statusText = when (result.status) {
                                 CollectStatus.SUCCESS -> "SUCCESS (${result.durationMs}ms)"
                                 CollectStatus.PARTIAL -> "PARTIAL (${result.durationMs}ms) — ${result.missingFields.size} missing"
@@ -287,38 +289,15 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
                         JsonField("session_id", json.optString("session_id"))
                         JsonField("visitor_id", json.optString("visitor_id"))
                         JsonField("collected_at", json.optString("collected_at"))
-                        JsonField("platform", json.optString("platform"))
                     }
                 }
 
-                // Collection summary card
-                val collection = json.optJSONObject("collection")
-                if (collection != null) {
-                    item {
-                        SectionCard(title = "Collection Summary") {
-                            JsonField("status", collection.optString("status"))
-                            JsonField("duration_ms", collection.opt("duration_ms")?.toString() ?: "")
-                            val modulesCollected = collection.optJSONArray("modules_collected")
-                            if (modulesCollected != null) {
-                                JsonField("modules_collected", jsonArrayToString(modulesCollected))
-                            }
-                            val missing = collection.optJSONArray("missing_fields")
-                            if (missing != null && missing.length() > 0) {
-                                JsonField("missing_fields", jsonArrayToString(missing))
-                            }
-                        }
-                    }
-                }
-
-                // One card per module section
-                val metadataKeys = setOf("schema_version", "id", "session_id", "visitor_id", "collected_at", "platform", "collection")
-                val moduleKeys = json.keys().asSequence().filter { it !in metadataKeys }.toList()
-
-                items(moduleKeys) { key ->
-                    val moduleJson = json.optJSONObject(key)
-                    if (moduleJson != null) {
-                        ModuleSectionCard(title = key, data = moduleJson)
-                    }
+                // Flat signal fields (everything except metadata)
+                val metadataKeys = setOf("schema_version", "id", "session_id", "visitor_id", "collected_at")
+                val signals = JSONObject()
+                json.keys().asSequence().filter { it !in metadataKeys }.forEach { signals.put(it, json.opt(it)) }
+                item {
+                    ModuleSectionCard(title = "signals", data = signals)
                 }
             }
         }

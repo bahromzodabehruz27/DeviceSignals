@@ -1,6 +1,7 @@
 package tj.behruz.devicesignals.sdk.internal.modules
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -12,6 +13,8 @@ import tj.behruz.devicesignals.sdk.internal.CollectContext
 import tj.behruz.devicesignals.sdk.internal.ModuleResult
 import tj.behruz.devicesignals.sdk.internal.SignalModule
 
+// Permission-gated calls are guarded by checkSelfPermission + SecurityException.
+@SuppressLint("MissingPermission")
 internal class TelephonyModule : SignalModule {
     override val module = Module.TELEPHONY
 
@@ -46,6 +49,7 @@ internal class TelephonyModule : SignalModule {
         var networkCountryIso: String? = null
         var isMultiSim: Boolean? = null
         var activeSimCount: Int? = null
+        var esimCount: Int? = null
 
         if (hasPermission) {
             simOperator = tm.simOperator?.ifEmpty { null }
@@ -53,22 +57,22 @@ internal class TelephonyModule : SignalModule {
             networkOperator = tm.networkOperator?.ifEmpty { null }
             networkCountryIso = tm.networkCountryIso?.ifEmpty { null }
 
-            if (Build.VERSION.SDK_INT >= 29) {
-                try {
-                    val sm = appContext.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
-                    val activeList = sm.activeSubscriptionInfoList
-                    activeSimCount = activeList?.size ?: 0
-                    isMultiSim = (activeSimCount ?: 0) > 1
-                } catch (_: SecurityException) {
-                    isMultiSim = null
-                    activeSimCount = null
-                    missingFields.add("is_multi_sim")
-                    missingFields.add("active_sim_count")
+            try {
+                val sm = appContext.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+                val activeList = sm.activeSubscriptionInfoList.orEmpty()
+                activeSimCount = activeList.size
+                isMultiSim = activeSimCount > 1
+                if (Build.VERSION.SDK_INT >= 28) {
+                    esimCount = activeList.count { it.isEmbedded }
+                } else {
+                    missingFields.add("esim_count")
                 }
+            } catch (_: SecurityException) {
+                missingFields.addAll(listOf("is_multi_sim", "active_sim_count", "esim_count"))
             }
         } else {
             val permFields = listOf("sim_operator", "sim_country_iso", "network_operator",
-                "network_country_iso", "is_multi_sim", "active_sim_count")
+                "network_country_iso", "is_multi_sim", "active_sim_count", "esim_count")
             missingFields.addAll(permFields)
         }
 
@@ -81,6 +85,7 @@ internal class TelephonyModule : SignalModule {
             "sim_state" to simState,
             "is_multi_sim" to isMultiSim,
             "active_sim_count" to activeSimCount,
+            "esim_count" to esimCount,
         )
         return ModuleResult(data = data, missingFields = missingFields)
     }

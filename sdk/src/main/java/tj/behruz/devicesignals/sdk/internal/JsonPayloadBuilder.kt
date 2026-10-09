@@ -2,6 +2,7 @@ package tj.behruz.devicesignals.sdk.internal
 
 import org.json.JSONArray
 import org.json.JSONObject
+import tj.behruz.devicesignals.sdk.BuildConfig
 import tj.behruz.devicesignals.sdk.CollectStatus
 import tj.behruz.devicesignals.sdk.Module
 import java.text.SimpleDateFormat
@@ -18,26 +19,23 @@ internal object JsonPayloadBuilder {
         status: CollectStatus,
         durationMs: Long,
         moduleData: Map<Module, Map<String, Any?>>,
-        missingFields: List<String>,
     ): String {
+        val mapped = SpecPayloadMapper.map(moduleData, status, BuildConfig.SDK_VERSION)
+
         val root = JSONObject()
-        root.put("schema_version", "1.0")
+        root.put("schema_version", "2.0")
         root.put("id", UUID.randomUUID().toString())
         root.put("session_id", sessionId)
         root.put("visitor_id", visitorId)
         root.put("collected_at", formatIso8601())
-        root.put("platform", "android")
+        root.put("collection_duration_ms", durationMs)
 
-        val collection = JSONObject()
-        collection.put("status", status.name)
-        collection.put("duration_ms", durationMs)
-        collection.put("modules_collected", JSONArray(moduleData.keys.map { it.jsonKey }))
-        collection.put("missing_fields", JSONArray(missingFields))
-        root.put("collection", collection)
-
-        for ((module, data) in moduleData) {
-            root.put(module.jsonKey, mapToJson(data))
+        val fields = mapToJson(mapped.fields)
+        for (key in fields.keys()) {
+            root.put(key, fields.get(key))
         }
+        root.put("collection_status", mapped.collectionStatus.name)
+        root.put("missing_fields", JSONArray(mapped.missingFields))
 
         return root.toString(2)
     }
