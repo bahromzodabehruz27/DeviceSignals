@@ -19,6 +19,8 @@ internal object JsonPayloadBuilder {
         status: CollectStatus,
         durationMs: Long,
         moduleData: Map<Module, Map<String, Any?>>,
+        startedAtMs: Long,
+        finishedAtMs: Long,
     ): String {
         val mapped = SpecPayloadMapper.map(moduleData, status, BuildConfig.SDK_VERSION)
 
@@ -27,7 +29,9 @@ internal object JsonPayloadBuilder {
         root.put("id", UUID.randomUUID().toString())
         root.put("session_id", sessionId)
         root.put("visitor_id", visitorId)
-        root.put("collected_at", formatIso8601())
+        root.put("collected_at", formatIso8601(Date()))
+        root.put("first_open", formatIso8601(Date(startedAtMs)))
+        root.put("last_open", formatIso8601(Date(finishedAtMs)))
         root.put("collection_duration_ms", durationMs)
 
         val fields = mapToJson(mapped.fields)
@@ -56,9 +60,9 @@ internal object JsonPayloadBuilder {
         return obj
     }
 
-    private fun formatIso8601(): String {
+    private fun formatIso8601(date: Date): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
-        return sdf.format(Date())
+        return sdf.format(date)
     }
 }

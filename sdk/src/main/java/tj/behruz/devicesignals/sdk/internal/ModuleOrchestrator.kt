@@ -60,19 +60,21 @@ internal class ModuleOrchestrator(
             }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
             if (moduleData.isEmpty()) {
-                val durationMs = System.currentTimeMillis() - startTime
+                val finishTime = System.currentTimeMillis()
                 return CollectResult(
                     status = CollectStatus.FAILED,
                     moduleData = moduleData,
                     missingFields = allMissingFields,
-                    durationMs = durationMs,
+                    durationMs = finishTime - startTime,
                     sessionId = sessionId,
                     visitorId = visitorId,
+                    startedAtMs = startTime,
+                    finishedAtMs = finishTime,
                 )
             }
         }
 
-        val durationMs = System.currentTimeMillis() - startTime
+        val finishTime = System.currentTimeMillis()
         val status = when {
             moduleData.isEmpty() -> CollectStatus.FAILED
             allMissingFields.isEmpty() -> CollectStatus.SUCCESS
@@ -83,9 +85,11 @@ internal class ModuleOrchestrator(
             status = status,
             moduleData = moduleData,
             missingFields = allMissingFields,
-            durationMs = durationMs,
+            durationMs = finishTime - startTime,
             sessionId = sessionId,
             visitorId = visitorId,
+            startedAtMs = startTime,
+            finishedAtMs = finishTime,
         )
     }
 
