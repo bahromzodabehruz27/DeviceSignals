@@ -2,7 +2,7 @@
 
 Android SDK for collecting device fingerprints, integrity signals, and fraud detection data.
 
-**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.4.0`
+**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.4.1`
 
 **Min SDK:** 24 (Android 7.0)
 
@@ -34,7 +34,7 @@ Android SDK for collecting device fingerprints, integrity signals, and fraud det
 
 ```kotlin
 dependencies {
-    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.4.0")
+    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.4.1")
 }
 ```
 
@@ -42,7 +42,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.bahromzodabehruz27:device-signals-sdk:0.4.0'
+    implementation 'io.github.bahromzodabehruz27:device-signals-sdk:0.4.1'
 }
 ```
 
@@ -261,7 +261,7 @@ The encrypted payload, once decrypted on your server, is an envelope with sessio
     "android_id": "android-id",
     "app_guid": "uuid-v4",
     "app_version": "1.2.3",
-    "sdk_version": "0.4.0",
+    "sdk_version": "0.4.1",
     "android_version": "14",
     "build_model": "SM-S911B",
     "build_manufacturer": "Samsung",
@@ -541,7 +541,7 @@ The effective modules for any `collect()` call is the intersection of `config.en
   "power_source": "USB",
   "usb_connected": true,
   "system_uptime": 468115,
-  "last_boot_time": 1791053702,
+  "last_boot_time": "2026-10-03T09:35:02Z",
   "collection_status": "SUCCESS",
   "missing_fields": []
 }
@@ -550,7 +550,7 @@ The effective modules for any `collect()` call is the intersection of `config.en
 Notes:
 - `play_integrity` is present only when `playIntegrityCloudProjectNumber` is configured. The backend decodes the token into `play_integrity.app_integrity`, `device_integrity` and `app_access_risk.*`.
 - `device_ip` is always `null`; the backend fills it from the request IP.
-- `total_storage` / `physical_memory` are bytes; `system_uptime` is seconds; `last_boot_time` is a Unix timestamp in seconds.
+- `total_storage` / `physical_memory` are bytes; `system_uptime` is seconds; `last_boot_time` is an RFC 3339 UTC timestamp (`2026-10-15T22:05:23Z`).
 - `system_integrity` is `COMPROMISED` if root, emulator, runtime tampering or an unlocked bootloader is detected; `TRUSTED` if all are confirmed clean and the bootloader is locked; otherwise `UNKNOWN`.
 - `missing_fields` lists every SDK-owned field that is `null`; any entry makes `collection_status` `PARTIAL`.
 

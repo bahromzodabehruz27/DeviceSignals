@@ -68,7 +68,7 @@ class SpecPayloadMapperTest {
         assertEquals("TRUSTED", f.fields["system_integrity"])
         assertEquals(256_000_000_000L, f.fields["total_storage"])
         assertEquals(90L, f.fields["system_uptime"])
-        assertEquals(1_700_000_000L, f.fields["last_boot_time"])
+        assertEquals("2023-11-14T22:13:20Z", f.fields["last_boot_time"])
         assertEquals("USB", f.fields["power_source"])
         assertEquals(true, f.fields["usb_connected"])
         assertEquals(mapOf("token" to "tok"), f.fields["play_integrity"])

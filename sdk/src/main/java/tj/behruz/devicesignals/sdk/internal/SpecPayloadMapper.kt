@@ -2,6 +2,10 @@ package tj.behruz.devicesignals.sdk.internal
 
 import tj.behruz.devicesignals.sdk.CollectStatus
 import tj.behruz.devicesignals.sdk.Module
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Projects raw per-module data onto the flat backend field contract.
@@ -90,7 +94,7 @@ internal object SpecPayloadMapper {
         f["power_source"] = chargingType?.let { if (it == "NONE") "BATTERY" else it }
         f["usb_connected"] = chargingType?.let { it == "USB" }
         f["system_uptime"] = elapsedRealtimeMs?.let { it / 1000 }
-        f["last_boot_time"] = bootTimeMs?.let { it / 1000 }
+        f["last_boot_time"] = bootTimeMs?.let { formatRfc3339(it) }
 
         val missing = f.filter { (key, value) -> value == null && key !in BACKEND_FIELDS }.keys.toMutableList()
         if (playIntegrity != null && playIntegrity["token"] == null) {
@@ -103,6 +107,13 @@ internal object SpecPayloadMapper {
             else -> CollectStatus.PARTIAL
         }
         return Mapped(f, missing, collectionStatus)
+    }
+
+    /** Backend expects RFC 3339 (`2026-10-15T22:05:23Z`), second precision, UTC. */
+    internal fun formatRfc3339(epochMs: Long): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        return sdf.format(Date(epochMs))
     }
 
     internal fun systemIntegrity(
