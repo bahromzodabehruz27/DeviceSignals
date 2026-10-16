@@ -360,7 +360,7 @@ dependencies {
 
 1. **Bump version** in `gradle.properties`:
    ```properties
-   SDK_VERSION=0.3.0
+   SDK_VERSION=0.4.0
    ```
 
 2. **Publish** (same command as Step 10):
@@ -370,8 +370,8 @@ dependencies {
 
 3. **Tag the release** in git:
    ```bash
-   git tag v0.3.0
-   git push origin v0.3.0
+   git tag v0.4.0
+   git push origin v0.4.0
    ```
 
 > **Important:** Maven Central does not allow overwriting a released version. Always bump the version number.

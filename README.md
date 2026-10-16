@@ -12,7 +12,7 @@ Android SDK for collecting device fingerprints, integrity signals, and fraud det
 
 ```kotlin
 dependencies {
-    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.3.0")
+    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.4.0")
 }
 ```
 

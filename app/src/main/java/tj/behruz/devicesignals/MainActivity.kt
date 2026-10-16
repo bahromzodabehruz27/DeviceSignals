@@ -296,20 +296,13 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
             val session = decryptedSession!!
             item {
                 SectionCard(title = "Device Session (decrypted)") {
-                    val meta = JSONObject()
-                    val signals = JSONObject()
-                    val metaKeys = setOf(
-                        "schema_version", "id", "session_id", "visitor_id", "collected_at",
-                        "first_open", "last_open", "collection_duration_ms",
-                        "device_hash", "first_seen", "last_seen",
-                        "collection_status", "missing_fields",
-                    )
-                    session.keys().asSequence().forEach { key ->
-                        (if (key in metaKeys) meta else signals).put(key, session.opt(key))
+                    val envelope = JSONObject()
+                    session.keys().asSequence().filter { it != "device" }.forEach { key ->
+                        envelope.put(key, session.opt(key))
                     }
-                    ModuleSectionCard(title = "session", data = meta)
+                    ModuleSectionCard(title = "session", data = envelope)
                     Spacer(Modifier.height(4.dp))
-                    ModuleSectionCard(title = "signals", data = signals)
+                    ModuleSectionCard(title = "device", data = session.optJSONObject("device") ?: JSONObject())
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = session.toString(2),

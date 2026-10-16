@@ -10,10 +10,19 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Builds the device-session JSON that is sealed by [tj.behruz.devicesignals.sdk.DeviceSdk.buildDeviceSession].
+ * Builds the device-session JSON that is sealed by [tj.behruz.devicesignals.sdk.DeviceSdk.buildDeviceSession]:
  *
- * The payload is the full flat collect payload (identical to [CollectResult.toJson]) extended with
- * session identity fields: `device_hash`, `first_seen`, `last_seen`.
+ * ```
+ * {
+ *   "id": "<sessionId>",
+ *   "first_seen": "...", "last_seen": "...",
+ *   "visitor_id": "<visitorId>",
+ *   "device": { ...full flat collect payload..., "device_hash": "..." }
+ * }
+ * ```
+ *
+ * `device` is [CollectResult.toJson] with the identity fields that already live on the envelope
+ * (`id`, `session_id`, `visitor_id`) removed and `device_hash` added.
  */
 internal object DeviceSessionBuilder {
 
@@ -40,12 +49,21 @@ internal object DeviceSessionBuilder {
                 "(from $manufacturer|$model|app_guid|device_id) first_seen=$firstSeen last_seen=$lastSeen"
         }
 
-        val root = JSONObject(collectResult.toJson())
-        root.put("device_hash", deviceHash)
+        val device = JSONObject(collectResult.toJson())
+        ENVELOPE_KEYS.forEach { device.remove(it) }
+        device.put("device_hash", deviceHash)
+
+        val root = JSONObject()
+        root.put("id", collectResult.sessionId)
         root.put("first_seen", firstSeen)
         root.put("last_seen", lastSeen)
+        root.put("visitor_id", collectResult.visitorId)
+        root.put("device", device)
         return root.toString()
     }
+
+    /** Collect-payload keys that are represented on the session envelope instead of inside `device`. */
+    private val ENVELOPE_KEYS = listOf("id", "session_id", "visitor_id")
 
     private fun formatIso8601Now(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)

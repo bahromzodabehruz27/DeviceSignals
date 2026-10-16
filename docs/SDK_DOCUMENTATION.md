@@ -2,7 +2,7 @@
 
 Android SDK for collecting device fingerprints, integrity signals, and fraud detection data.
 
-**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.3.0`
+**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.4.0`
 
 **Min SDK:** 24 (Android 7.0)
 
@@ -34,7 +34,7 @@ Android SDK for collecting device fingerprints, integrity signals, and fraud det
 
 ```kotlin
 dependencies {
-    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.3.0")
+    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.4.0")
 }
 ```
 
@@ -42,7 +42,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.bahromzodabehruz27:device-signals-sdk:0.3.0'
+    implementation 'io.github.bahromzodabehruz27:device-signals-sdk:0.4.0'
 }
 ```
 
@@ -201,6 +201,79 @@ val encryptedSession: String = DeviceSdk.buildDeviceSession(
 
 // Send encryptedSession to your backend
 api.submitDeviceSession(encryptedSession)
+```
+
+### Inspecting a Session On-Device (debug)
+
+`DeviceSessionCrypto` lets a demo / QA build generate a throwaway keypair and open the sealed payload locally to see exactly what is sent. Never ship a real backend private key in an app.
+
+```kotlin
+val keys = DeviceSessionCrypto.generateKeyPair()
+DeviceSdk.init(context, SdkConfig(deviceId = "dev-1", fraudPublicKeyBase64 = keys.publicKeyBase64))
+
+val sealed = DeviceSdk.buildDeviceSession("session-1", "visitor-1")
+val json = DeviceSessionCrypto.open(sealed, keys.publicKeyBase64, keys.privateKeyBase64)
+```
+
+`open` throws `DeviceSdkException.EncryptionException` if the key does not match (MAC verification fails).
+
+### Key Generation
+
+The public key must be a 32-byte X25519 public key, base64-encoded. Generate a keypair on your server:
+
+```python
+# Python (PyNaCl)
+from nacl.public import PrivateKey
+import base64
+
+private_key = PrivateKey.generate()
+public_key = private_key.public_key
+print("Public:", base64.b64encode(bytes(public_key)).decode())
+print("Private:", base64.b64encode(bytes(private_key)).decode())
+```
+
+### Device Session Payload
+
+The encrypted payload, once decrypted on your server, is an envelope with session identity fields and a `device` object. `device` is the **same flat JSON as `CollectResult.toJson()`** (all spec fields, `collection_status`, `missing_fields`, etc.) minus the identity keys that live on the envelope (`id`, `session_id`, `visitor_id`), plus `device_hash`.
+
+| Field | Description |
+|-------|-------------|
+| `id` | The `sessionId` passed to `buildDeviceSession` |
+| `first_seen` | First time the SDK ran on this install (ISO 8601 UTC) |
+| `last_seen` | Time this session was built (ISO 8601 UTC) |
+| `visitor_id` | The `visitorId` passed to `buildDeviceSession` |
+| `device.device_hash` | SHA-256 of `manufacturer|model|app_guid|SdkConfig.deviceId` -- stable across sessions |
+
+```json
+{
+  "id": "session-123",
+  "first_seen": "2024-01-15T10:30:00Z",
+  "last_seen": "2024-03-22T14:20:00Z",
+  "visitor_id": "visitor-456",
+  "device": {
+    "schema_version": "2.0",
+    "collected_at": "2024-03-22T14:20:00.123Z",
+    "first_open": "2024-03-22T14:19:58.900Z",
+    "last_open": "2024-03-22T14:20:00.123Z",
+    "collection_duration_ms": 1223,
+    "platform": "Android",
+    "device_id": "drm-id",
+    "android_id": "android-id",
+    "app_guid": "uuid-v4",
+    "app_version": "1.2.3",
+    "sdk_version": "0.4.0",
+    "android_version": "14",
+    "build_model": "SM-S911B",
+    "build_manufacturer": "Samsung",
+    "is_emulator": false,
+    "is_rooted": false,
+    "system_integrity": "TRUSTED",
+    "...": "all other collect fields",
+    "collection_status": "SUCCESS",
+    "missing_fields": [],
+    "device_hash": "sha256-hash"
+  }
+}
 ```
 
 ### Inspecting a Session On-Device (debug)
