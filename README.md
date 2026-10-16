@@ -198,7 +198,7 @@ DeviceSdk (public API)
   │     └── ModuleCache (static module caching)
   ├── IdentityStore (encrypted persistent IDs)
   ├── SealedBoxCrypto (NaCl sealed box encryption)
-  ├── DeviceSessionBuilder (structured sessions)
+  ├── DeviceSessionBuilder (collect payload + device_hash/first_seen/last_seen)
   └── JsonPayloadBuilder (JSON serialization)
 ```
 

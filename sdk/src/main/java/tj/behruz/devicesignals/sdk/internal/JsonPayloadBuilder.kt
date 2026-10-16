@@ -41,6 +41,13 @@ internal object JsonPayloadBuilder {
         root.put("collection_status", mapped.collectionStatus.name)
         root.put("missing_fields", JSONArray(mapped.missingFields))
 
+        SdkLog.debug {
+            "payload: schema=2.0 status=${mapped.collectionStatus} " +
+                "fields=${mapped.fields.size} " +
+                (if (mapped.missingFields.isEmpty()) "missing=none" else "missing=${mapped.missingFields}")
+        }
+        SdkLog.debug { "payload fields: ${SdkLog.formatFields(mapped.fields)}" }
+
         return root.toString(2)
     }
 

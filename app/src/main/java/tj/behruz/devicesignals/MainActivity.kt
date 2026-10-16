@@ -51,11 +51,19 @@ import org.json.JSONObject
 import tj.behruz.devicesignals.sdk.CollectResult
 import tj.behruz.devicesignals.sdk.CollectStatus
 import tj.behruz.devicesignals.sdk.DeviceSdk
+import tj.behruz.devicesignals.sdk.DeviceSessionCrypto
+import tj.behruz.devicesignals.sdk.LogLevel
+import tj.behruz.devicesignals.sdk.LogcatLogger
 import tj.behruz.devicesignals.sdk.Module
 import tj.behruz.devicesignals.sdk.SdkConfig
 import tj.behruz.devicesignals.ui.theme.DeviceSignalsTheme
 
-private const val DEMO_FRAUD_PUBLIC_KEY = "HLDZQov2k4syHBXdVmZ0uLiMsSMMI2oxAgWprt/9znA="
+/**
+ * Demo-only X25519 keypair, generated per process. The public half goes into [SdkConfig] so the
+ * SDK can seal sessions; the private half stays here so the demo can open them again and show
+ * what is inside. A real backend never ships its private key in an app.
+ */
+private val DEMO_KEYS by lazy { DeviceSessionCrypto.generateKeyPair() }
 
 class MainActivity : ComponentActivity() {
 
@@ -71,7 +79,9 @@ class MainActivity : ComponentActivity() {
             this,
             SdkConfig(
                 deviceId = "demo-device-id-001",
-                fraudPublicKeyBase64 = DEMO_FRAUD_PUBLIC_KEY,
+                fraudPublicKeyBase64 = DEMO_KEYS.publicKeyBase64,
+                logLevel = LogLevel.DEBUG,
+                logger = LogcatLogger,
             ),
         )
         DeviceSdk.attach(this)
@@ -111,6 +121,8 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
     var errorText by remember { mutableStateOf<String?>(null) }
     var deviceSessionBase64 by remember { mutableStateOf<String?>(null) }
     var buildingSession by remember { mutableStateOf(false) }
+    var decryptedSession by remember { mutableStateOf<JSONObject?>(null) }
+    var decryptError by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = modifier
@@ -201,6 +213,8 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
                     buildingSession = true
                     deviceSessionBase64 = null
                     errorText = null
+                    decryptedSession = null
+                    decryptError = null
                     scope.launch {
                         try {
                             val base64 = DeviceSdk.buildDeviceSession(sessionId, visitorId)
@@ -232,14 +246,76 @@ private fun DemoScreen(modifier: Modifier = Modifier) {
                         modifier = Modifier.padding(top = 4.dp),
                     )
                     Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(deviceSessionBase64!!))
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Copy")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(deviceSessionBase64!!))
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Copy")
+                        }
+                        Button(
+                            onClick = {
+                                try {
+                                    val json = DeviceSessionCrypto.open(
+                                        sealedBase64 = deviceSessionBase64!!,
+                                        publicKeyBase64 = DEMO_KEYS.publicKeyBase64,
+                                        privateKeyBase64 = DEMO_KEYS.privateKeyBase64,
+                                    )
+                                    decryptedSession = JSONObject(json)
+                                    decryptError = null
+                                } catch (e: Exception) {
+                                    decryptedSession = null
+                                    decryptError = "${e.javaClass.simpleName}: ${e.message}"
+                                }
+                            },
+                            enabled = decryptedSession == null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Decrypt")
+                        }
                     }
+                }
+            }
+        }
+
+        if (decryptError != null) {
+            item {
+                SectionCard(title = "Decrypt failed", isError = true) {
+                    Text(
+                        text = decryptError!!,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                    )
+                }
+            }
+        }
+
+        if (decryptedSession != null) {
+            val session = decryptedSession!!
+            item {
+                SectionCard(title = "Device Session (decrypted)") {
+                    val meta = JSONObject()
+                    val signals = JSONObject()
+                    val metaKeys = setOf(
+                        "schema_version", "id", "session_id", "visitor_id", "collected_at",
+                        "first_open", "last_open", "collection_duration_ms",
+                        "device_hash", "first_seen", "last_seen",
+                        "collection_status", "missing_fields",
+                    )
+                    session.keys().asSequence().forEach { key ->
+                        (if (key in metaKeys) meta else signals).put(key, session.opt(key))
+                    }
+                    ModuleSectionCard(title = "session", data = meta)
+                    Spacer(Modifier.height(4.dp))
+                    ModuleSectionCard(title = "signals", data = signals)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = session.toString(2),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                    )
                 }
             }
         }

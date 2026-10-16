@@ -180,7 +180,7 @@ val model = result.moduleData[Module.HARDWARE]?.get("model") as? String
 
 ## Building Device Sessions
 
-`buildDeviceSession()` collects all signals, builds a structured `DeviceSession` object, encrypts it with a public key (NaCl sealed box), and returns the result as a base64 string. This is intended for sending to your backend for server-side fraud analysis.
+`buildDeviceSession()` collects all signals, builds the full collect payload plus session identity fields, encrypts it with a public key (NaCl sealed box), and returns the result as a base64 string. This is intended for sending to your backend for server-side fraud analysis.
 
 **Requirements:** `deviceId` and `fraudPublicKeyBase64` must be set in `SdkConfig`.
 
@@ -203,6 +203,20 @@ val encryptedSession: String = DeviceSdk.buildDeviceSession(
 api.submitDeviceSession(encryptedSession)
 ```
 
+### Inspecting a Session On-Device (debug)
+
+`DeviceSessionCrypto` lets a demo / QA build generate a throwaway keypair and open the sealed payload locally to see exactly what is sent. Never ship a real backend private key in an app.
+
+```kotlin
+val keys = DeviceSessionCrypto.generateKeyPair()
+DeviceSdk.init(context, SdkConfig(deviceId = "dev-1", fraudPublicKeyBase64 = keys.publicKeyBase64))
+
+val sealed = DeviceSdk.buildDeviceSession("session-1", "visitor-1")
+val json = DeviceSessionCrypto.open(sealed, keys.publicKeyBase64, keys.privateKeyBase64)
+```
+
+`open` throws `DeviceSdkException.EncryptionException` if the key does not match (MAC verification fails).
+
 ### Key Generation
 
 The public key must be a 32-byte X25519 public key, base64-encoded. Generate a keypair on your server:
@@ -218,38 +232,44 @@ print("Public:", base64.b64encode(bytes(public_key)).decode())
 print("Private:", base64.b64encode(bytes(private_key)).decode())
 ```
 
-### DeviceSession Structure
+### Device Session Payload
 
-The encrypted payload, once decrypted on your server, contains:
+The encrypted payload, once decrypted on your server, is the **same flat JSON as `CollectResult.toJson()`** (all spec fields, `collection_status`, `missing_fields`, etc.) extended with three session identity fields:
+
+| Field | Description |
+|-------|-------------|
+| `device_hash` | SHA-256 of `manufacturer|model|app_guid|SdkConfig.deviceId` -- stable across sessions |
+| `first_seen` | First time the SDK ran on this install (ISO 8601 UTC) |
+| `last_seen` | Time this session was built (ISO 8601 UTC) |
 
 ```json
 {
-  "id": "session-123",
+  "schema_version": "2.0",
+  "id": "uuid-v4",
+  "session_id": "session-123",
   "visitor_id": "visitor-456",
+  "collected_at": "2024-03-22T14:20:00.123Z",
+  "first_open": "2024-03-22T14:19:58.900Z",
+  "last_open": "2024-03-22T14:20:00.123Z",
+  "collection_duration_ms": 1223,
+  "platform": "Android",
+  "device_id": "drm-id",
+  "android_id": "android-id",
+  "app_guid": "uuid-v4",
+  "app_version": "1.2.3",
+  "sdk_version": "1.0.0",
+  "android_version": "14",
+  "build_model": "SM-S911B",
+  "build_manufacturer": "Samsung",
+  "is_emulator": false,
+  "is_rooted": false,
+  "system_integrity": "TRUSTED",
+  "...": "all other collect fields",
+  "collection_status": "SUCCESS",
+  "missing_fields": [],
+  "device_hash": "sha256-hash",
   "first_seen": "2024-01-15T10:30:00Z",
-  "last_seen": "2024-03-22T14:20:00Z",
-  "device": {
-    "device_id": "your-device-id",
-    "device_hash": "sha256-hash",
-    "os": "Android",
-    "os_version": "14",
-    "app_version": "1.2.3",
-    "app_guid": "uuid-v4",
-    "is_emulator": false,
-    "is_rooted": false,
-    "battery_level": 85,
-    "screen_width": 1080,
-    "carrier_name": "T-Mobile",
-    "region_timezone": "America/New_York",
-    "manufacturer": "Samsung",
-    "model": "SM-S911B",
-    "total_ram_mb": 8192,
-    "cpu_cores": 8,
-    "connection_type": "WIFI",
-    "is_vpn_active": false,
-    "sim_country_iso": "us"
-  },
-  "events": []
+  "last_seen": "2024-03-22T14:20:00Z"
 }
 ```
 
@@ -308,6 +328,27 @@ DeviceSdk.init(
     ),
 )
 ```
+
+### Logging
+
+Logging is off by default (`logLevel = LogLevel.NONE`). To see what the SDK collects, enable it with the built-in logcat logger (tag `DeviceSignals`):
+
+```kotlin
+val config = SdkConfig(
+    logLevel = LogLevel.DEBUG,
+    logger = LogcatLogger,
+)
+```
+
+What is logged at each level:
+
+| Level | Events |
+|-------|--------|
+| `ERROR` | A module threw, collection failed entirely, session build / callback collect failed |
+| `WARN` | Global collect timeout hit (lists which modules did and did not finish) |
+| `DEBUG` | `init` summary (modules, Play Integrity, deviceId / fraud key presence), collect start (requested / skipped modules, timeouts), per-module status + full `key=value` dump of collected data, collect summary (status, duration, missing fields), payload summary + all spec fields, session identity (`device_hash`, `first_seen`, `last_seen`) and sealed payload sizes |
+
+DEBUG dumps include raw signal values (`android_id`, DRM id, SIM data, etc.). Keep it off in production builds.
 
 ### Custom Logger
 
@@ -643,9 +684,9 @@ The SDK ships with consumer ProGuard rules that are automatically applied to you
 The rules keep all public API classes:
 - `DeviceSdk`, `SdkConfig`, `CollectResult`, `CollectStatus`
 - `Module`, `ModuleStatus`, `LogLevel`
-- `SdkLogger`, `CollectCallback`
+- `SdkLogger`, `LogcatLogger`, `CollectCallback`
+- `DeviceSessionCrypto` (debug: generate keypair, open sealed session)
 - `DeviceSdkException` and its subclasses
-- `DeviceSession`, `DeviceSession.Device`, `DeviceSession.Event`
 
 ---
 

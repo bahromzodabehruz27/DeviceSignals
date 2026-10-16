@@ -9,7 +9,6 @@ import tj.behruz.devicesignals.sdk.LogLevel
 import tj.behruz.devicesignals.sdk.Module
 import tj.behruz.devicesignals.sdk.ModuleStatus
 import tj.behruz.devicesignals.sdk.SdkConfig
-import tj.behruz.devicesignals.sdk.SdkLogger
 import tj.behruz.devicesignals.sdk.internal.cache.ModuleCache
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -17,9 +16,6 @@ internal class ModuleOrchestrator(
     private val modules: List<SignalModule>,
     private val config: SdkConfig,
 ) {
-    private val logger: SdkLogger? get() = config.logger
-    private val logLevel: LogLevel get() = config.logLevel
-
     suspend fun collect(
         collectContext: CollectContext,
         sessionId: String,
@@ -28,6 +24,16 @@ internal class ModuleOrchestrator(
     ): CollectResult {
         val effectiveModules = computeEffectiveModules(requestedModules)
         val moduleMap = modules.associateBy { it.module }
+        val skipped = requestedModules - effectiveModules
+        val unregistered = effectiveModules.filter { it !in moduleMap }
+
+        SdkLog.debug {
+            "collect start: session=$sessionId visitor=$visitorId " +
+                "modules=${effectiveModules.names()} " +
+                (if (skipped.isNotEmpty()) "skipped(disabled)=${skipped.names()} " else "") +
+                (if (unregistered.isNotEmpty()) "skipped(unregistered)=${unregistered.names()} " else "") +
+                "timeout=${config.timeoutMs}ms moduleTimeout=${config.moduleTimeoutMs}ms"
+        }
 
         val startTime = System.currentTimeMillis()
         val moduleData = mutableMapOf<Module, Map<String, Any?>>()
@@ -59,8 +65,14 @@ internal class ModuleOrchestrator(
                 }
             }
         } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+            val notCollected = effectiveModules.filter { it !in moduleData }
+            SdkLog.warn {
+                "collect timed out after ${config.timeoutMs}ms; " +
+                    "collected=${moduleData.keys.names()} notCollected=${notCollected.names()}"
+            }
             if (moduleData.isEmpty()) {
                 val finishTime = System.currentTimeMillis()
+                SdkLog.error { "collect FAILED: no module finished before the global timeout" }
                 return CollectResult(
                     status = CollectStatus.FAILED,
                     moduleData = moduleData,
@@ -79,6 +91,13 @@ internal class ModuleOrchestrator(
             moduleData.isEmpty() -> CollectStatus.FAILED
             allMissingFields.isEmpty() -> CollectStatus.SUCCESS
             else -> CollectStatus.PARTIAL
+        }
+
+        SdkLog.log(if (status == CollectStatus.FAILED) LogLevel.ERROR else LogLevel.DEBUG) {
+            "collect done: status=$status in ${finishTime - startTime}ms, " +
+                "modules=${moduleData.size}/${effectiveModules.size} " +
+                "fields=${moduleData.values.sumOf { it.size }} " +
+                (if (allMissingFields.isEmpty()) "missing=none" else "missing=$allMissingFields")
         }
 
         return CollectResult(
@@ -107,13 +126,21 @@ internal class ModuleOrchestrator(
             }
             val elapsed = System.currentTimeMillis() - start
             moduleStatus = if (result.missingFields.isEmpty()) ModuleStatus.SUCCESS else ModuleStatus.PARTIAL
-            log(LogLevel.DEBUG, "Module ${impl.module.jsonKey} completed in ${elapsed}ms: $moduleStatus")
+            SdkLog.debug {
+                "module ${impl.module.jsonKey}: $moduleStatus in ${elapsed}ms, " +
+                    "${result.data.size} fields" +
+                    (if (result.missingFields.isEmpty()) "" else ", missing=${result.missingFields}")
+            }
+            SdkLog.debug { "module ${impl.module.jsonKey} data: ${SdkLog.formatFields(result.data)}" }
             config.onModuleCompleted?.invoke(impl.module, elapsed, moduleStatus)
             return result
         } catch (e: Exception) {
             val elapsed = System.currentTimeMillis() - start
             moduleStatus = ModuleStatus.FAILED
-            log(LogLevel.ERROR, "Module ${impl.module.jsonKey} failed in ${elapsed}ms: ${e.javaClass.simpleName}")
+            SdkLog.error {
+                "module ${impl.module.jsonKey}: FAILED in ${elapsed}ms: ${e.javaClass.simpleName}" +
+                    (e.message?.let { ": $it" } ?: "")
+            }
             config.onModuleCompleted?.invoke(impl.module, elapsed, moduleStatus)
             throw e
         }
@@ -136,13 +163,5 @@ internal class ModuleOrchestrator(
         missingFields.add("${mod.jsonKey}.*")
     }
 
-    private fun log(level: LogLevel, message: String) {
-        if (logLevel != LogLevel.NONE && logLevel.ordinal >= level.ordinal) {
-            logger?.log(level, TAG, message)
-        }
-    }
-
-    companion object {
-        private const val TAG = "DeviceSignals"
-    }
+    private fun Iterable<Module>.names(): String = joinToString(",", "[", "]") { it.jsonKey }
 }

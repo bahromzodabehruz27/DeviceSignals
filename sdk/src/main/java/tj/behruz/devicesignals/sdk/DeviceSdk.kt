@@ -13,6 +13,7 @@ import tj.behruz.devicesignals.sdk.internal.CallTracker
 import tj.behruz.devicesignals.sdk.internal.DeviceSessionBuilder
 import tj.behruz.devicesignals.sdk.internal.IdentityStore
 import tj.behruz.devicesignals.sdk.internal.ModuleOrchestrator
+import tj.behruz.devicesignals.sdk.internal.SdkLog
 import tj.behruz.devicesignals.sdk.internal.SealedBoxCrypto
 import tj.behruz.devicesignals.sdk.internal.CollectContext
 import tj.behruz.devicesignals.sdk.internal.SignalModule
@@ -51,6 +52,7 @@ object DeviceSdk {
     fun init(context: Context, config: SdkConfig = SdkConfig()) {
         this.appContext = context.applicationContext
         this.config = config
+        SdkLog.configure(config.logger, config.logLevel)
         this.identityStore = IdentityStore(appContext)
         ModuleCache.reset()
         CallTracker.start(appContext)
@@ -76,6 +78,14 @@ object DeviceSdk {
         registerModules(modules)
 
         this.initialized = true
+        SdkLog.debug {
+            "init: sdk=${BuildConfig.SDK_VERSION} " +
+                "modules=${modules.joinToString(",", "[", "]") { it.module.jsonKey }} " +
+                "enabled=${config.enabledModules.size}/${Module.ALL.size} " +
+                "playIntegrity=${if (projectNumber != null) "on" else "off"} " +
+                "deviceId=${if (config.deviceId != null) "set" else "unset"} " +
+                "fraudKey=${if (config.fraudPublicKeyBase64 != null) "set" else "unset"}"
+        }
     }
 
     internal fun registerModules(modules: List<SignalModule>) {
@@ -119,7 +129,8 @@ object DeviceSdk {
             try {
                 val result = orchestrator.collect(collectContext(), sessionId, visitorId, modules)
                 callback.onResult(result)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                SdkLog.error { "collect failed: ${e.javaClass.simpleName}: ${e.message}" }
                 callback.onResult(
                     CollectResult(
                         status = CollectStatus.FAILED,
@@ -155,6 +166,7 @@ object DeviceSdk {
                 "fraudPublicKeyBase64 must be set in SdkConfig"
             )
         val fraudPublicKey = SealedBoxCrypto.decodeAndValidatePublicKey(fraudKeyBase64)
+        SdkLog.debug { "session build start: session=$sessionId visitor=$visitorId" }
 
         val collectResult = withContext(Dispatchers.Default) {
             orchestrator.collect(collectContext(), sessionId, visitorId, Module.ALL)
@@ -163,16 +175,20 @@ object DeviceSdk {
         val appGuid = identityStore.getAppGuid()
         val firstSeen = identityStore.getFirstSeen()
 
-        val session = DeviceSessionBuilder.build(
+        val json = DeviceSessionBuilder.buildJson(
             collectResult = collectResult,
             deviceId = deviceId,
             appGuid = appGuid,
             firstSeen = firstSeen,
         )
-
-        val json = session.toJson()
-        val sealed = SealedBoxCrypto.seal(json.toByteArray(Charsets.UTF_8), fraudPublicKey)
-        return Base64.encodeToString(sealed, Base64.NO_WRAP)
+        val plain = json.toByteArray(Charsets.UTF_8)
+        val sealed = SealedBoxCrypto.seal(plain, fraudPublicKey)
+        val base64 = Base64.encodeToString(sealed, Base64.NO_WRAP)
+        SdkLog.debug {
+            "session build done: status=${collectResult.status} " +
+                "json=${plain.size}B sealed=${sealed.size}B base64=${base64.length} chars"
+        }
+        return base64
     }
 
     @JvmStatic
@@ -186,7 +202,8 @@ object DeviceSdk {
             try {
                 val result = buildDeviceSession(sessionId, visitorId)
                 callback(result)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                SdkLog.error { "session build failed: ${e.javaClass.simpleName}: ${e.message}" }
                 callback(null)
             }
         }
