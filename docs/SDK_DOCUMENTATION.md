@@ -2,7 +2,7 @@
 
 Android SDK for collecting device fingerprints, integrity signals, and fraud detection data.
 
-**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.1.0`
+**Maven coordinates:** `io.github.bahromzodabehruz27:device-signals-sdk:0.3.0`
 
 **Min SDK:** 24 (Android 7.0)
 
@@ -34,7 +34,7 @@ Android SDK for collecting device fingerprints, integrity signals, and fraud det
 
 ```kotlin
 dependencies {
-    implementation("tj.behruz.devicesignals:device-signals-sdk:0.1.0")
+    implementation("io.github.bahromzodabehruz27:device-signals-sdk:0.3.0")
 }
 ```
 
@@ -42,7 +42,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'tj.behruz.devicesignals:device-signals-sdk:0.1.0'
+    implementation 'io.github.bahromzodabehruz27:device-signals-sdk:0.3.0'
 }
 ```
 
